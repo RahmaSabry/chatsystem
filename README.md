@@ -1,8 +1,3 @@
-application 
-curl -d '{"name":"application1"}' -H "Content-Type: application/json" -X POST http://localhost:3000/applications
-
-
-
 
 # README
 
