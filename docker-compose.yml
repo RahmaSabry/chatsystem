@@ -1,0 +1,116 @@
+version : '3'
+
+services:
+  web:
+    build: .
+    command: bash -c "rm -f tmp/pids/server.pid && bundle exec rails s -p 3000 -b '0.0.0.0'"
+    volumes:
+      - .:/chatsystem
+      - bundler_gems:/usr/local/bundle/
+    ports:
+      - "3000:3000"
+    environment:
+        DB_USER: root
+        DB_PASSWORD: password
+        DB_NAME: chat_system
+        DB_HOST: db
+        DB_PORT: 3306
+        ELASTIC_HOST: elastic
+        ELASTIC_POST: 9200
+    depends_on:
+      - db
+      - elastic
+      - sidekiq
+    links:
+      - db
+      - elastic
+
+    networks:
+      - ruby
+
+  delayed_job:
+    build: .
+    command: bundle exec rails jobs:work
+    volumes:
+      - .:/chatsystem
+    depends_on:
+      - db
+      - web
+    networks:
+      - ruby
+  cron_job:
+    build: .
+    command: cron -f
+    volumes:
+      - .:/chatsystem
+    depends_on:
+      - db
+    networks:
+      - ruby
+  
+
+  phpmyadmin:
+    image: phpmyadmin
+    restart: always
+    ports:
+      - 8083:80
+    environment:
+      PMA_HOST: db
+      UPLOAD_LIMIT: 5000M
+    depends_on:
+      - db
+    networks:
+      - ruby
+  sidekiq:
+    build: .
+    volumes:
+      - .:/chatsystem
+    depends_on:
+      - redis
+    command: bundle exec sidekiq
+    environment:
+      - REDIS_URL_SIDEKIQ=redis://redis:6379/12
+    networks:
+      - ruby
+    links:
+      - redis
+  db: 
+    image: 'mysql:8.0'
+    ports:
+        - '3306:3306'
+    command: --default-authentication-plugin=mysql_native_password --init-file /chatsystem/init.sql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+      MYSQL_ROOT_PASSWORD: password
+    volumes:
+        - ./init.sql:/chatsystem/init.sql
+    networks:
+      - ruby
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping"]
+  
+  redis:
+    image: 'redis'
+    command: redis-server
+    ports:
+      - '6379:6379'
+    volumes:
+      - 'redis:/data'
+    networks:
+      - ruby  
+  elastic:
+    container_name: elastic
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.11.0
+    environment:
+      - xpack.security.enabled=false
+      - "discovery.type=single-node"
+    networks:
+      - ruby
+    ports:
+      - 9200:9200
+networks:
+  ruby:
+    driver: bridge
+volumes:
+  bundler_gems:
+  redis:
