@@ -111,4 +111,4 @@ GET http://localhost:3000/messages/search/1?word=new
 ```
 Authorization: [application token]
 `````
-* response : messages thier body containts that work
+* response : messages their body containts that work
